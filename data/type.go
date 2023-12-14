@@ -1,38 +1,42 @@
 package data
 
 import (
-	"encoding/json"
+	// "encoding/json"
 
 	curppb "github.com/xline-kv/mock-xline/gen/curppb"
-	xlinepb "github.com/xline-kv/mock-xline/gen/xlinepb"
-	"google.golang.org/protobuf/proto"
+	// xlinepb "github.com/xline-kv/mock-xline/gen/xlinepb"
+	// "google.golang.org/protobuf/proto"
 )
 
 type Request = string
 
-type Response struct {
-	Res interface{}
+type ResponseWrapper[T curppb.FetchClusterResponse | curppb.ProposeResponse | curppb.WaitSyncedResponse] struct {
+	Res T
 	Err error
 }
 
-func NewResponse(res interface{}, err error) Response {
-	return Response{Res: res, Err: err}
+type Response[T curppb.FetchClusterResponse | curppb.ProposeResponse | curppb.WaitSyncedResponse] struct {
+	Index uint
+	Res   []ResponseWrapper[T]
 }
 
-func NewProposeRequest(cmd *xlinepb.Command, clusterVer uint64) (*Request, error) {
-	bcmd, err := proto.Marshal(cmd)
-	if err != nil {
-		return nil, err
-	}
-	req := &curppb.ProposeRequest{
-		Command:        bcmd,
-		ClusterVersion: clusterVer,
-	}
-	breq, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-	sreq := string(breq)
-	return &sreq, nil
-}
+// func NewResponse(res interface{}, err error) Response {
+// 	return Response{Res: res, Err: err}
+// }
 
+// func NewProposeRequest(cmd *xlinepb.Command, clusterVer uint64) (*Request, error) {
+// 	bcmd, err := proto.Marshal(cmd)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	req := &curppb.ProposeRequest{
+// 		Command:        bcmd,
+// 		ClusterVersion: clusterVer,
+// 	}
+// 	breq, err := json.Marshal(req)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	sreq := string(breq)
+// 	return &sreq, nil
+// }

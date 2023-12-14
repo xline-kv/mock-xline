@@ -6,9 +6,9 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/xline-kv/mock-xline/data"
 	curppb "github.com/xline-kv/mock-xline/gen/curppb"
 	"github.com/xline-kv/mock-xline/server"
-
 )
 
 func main()  {
@@ -17,7 +17,11 @@ func main()  {
 		panic(err)
 	}
 	s := grpc.NewServer()
-	curppb.RegisterProtocolServer(s, &server.ProtocolServer{})
+	curppb.RegisterProtocolServer(s, &server.ProtocolServer{
+		FetchClusterMap: data.NewFetchClusterDataMap(),
+		ProposeMap: data.NewProposeDataMap(),
+		WaitSyncedMap: data.NewWaitSyncedDataMap(),
+	})
 	//...
 	fmt.Printf("server listening at %v\n", lis.Addr())
 	if err := s.Serve(lis); err != nil {
