@@ -20,8 +20,5 @@
 # Go workspace file
 go.work
 
-# Protobuf generated file
-gen
-
 # VSCode config file
 .vscode

@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package mockpb;
+
+option go_package = ".;mockpb";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+
+message MockRequest {
+    // The serialized request
+    bytes request = 1;
+    repeated Response response = 2;
+}
+
+message Response {
+    oneof response {
+        // The serialized response
+        bytes success = 1;
+        Status error = 2;
+    }
+    // The times of request when return the response
+    uint64 index = 3;
+    google.protobuf.Timestamp delay = 4;
+}
+
+message Status {
+    int32 code = 1;
+    string message = 2;
+    repeated google.protobuf.Any details = 3;
+  }
+
+message MockResponse {}
+
+service Mock {
+    rpc MockFetchCluster (MockRequest) returns (MockResponse);
+    rpc MockPropose (MockRequest) returns (MockResponse);
+    rpc MockWaitSynced (MockRequest) returns (MockResponse);
+}
