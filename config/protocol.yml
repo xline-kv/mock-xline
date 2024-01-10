@@ -1,0 +1,29 @@
+- type: fetch_cluster
+  config_request:
+    fetch_cluster_request:
+  config_response:
+    fetch_cluster_response:
+      - type: success
+        success:
+          leader_id: 1357
+          term: 1
+          cluster_id: 2468
+          members:
+            - id: 1357
+              name: node1
+              addrs:
+                - 127.0.0.1:5555
+          cluster_version: 1
+- type: put
+  config_request:
+    put_request:
+      key: key
+      value: val
+  config_response:
+    put_response:
+      - propose:
+          type: success
+          success:
+        wait_synced:
+          type: success
+          success:
