@@ -2,11 +2,12 @@ package server
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	curppb "github.com/xline-kv/mock-xline/gen/curppb"
 	xlinepb "github.com/xline-kv/mock-xline/gen/xlinepb"
-	"github.com/xline-kv/mock-xline/sample"
+
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -15,68 +16,140 @@ import (
 type protocolServer struct {
 	curppb.ProtocolServer
 
-	fetchClusterSample sample.FetchClusterMap
-	proposeSample      sample.ProposeMap
-	waitSyncSample     sample.WaitSyncedMap
-	commandSample      sample.CommandMap
+	fetchClusterCnt  uint
+	putProposeCnt    uint
+	putWaitSyncedCnt uint
+
+	fetchClusterConfigMap map[FetchClusterConfigRequest][]FetchClusterConfigResponse
+	putConfigMap          map[PutConfigRequest][]PutConfigResponseWrapper
+	waitSyncedConfigMap   map[string]PutConfigRequest
 }
 
-func NewProtocolServer(
-	fetchClusterSample sample.FetchClusterMap,
-	proposeSample sample.ProposeMap,
-	waitSyncSample sample.WaitSyncedMap,
-) *protocolServer {
+func NewProtocolServer(cfgs Configs) *protocolServer {
 	return &protocolServer{
-		fetchClusterSample: fetchClusterSample,
-		proposeSample:      proposeSample,
-		waitSyncSample:     waitSyncSample,
-		commandSample:      sample.CommandMap{},
+		fetchClusterConfigMap: BuildFetchClusterConfigMapFromConfigs(cfgs),
+		putConfigMap:          BuildPutConfigMapFromConfigs(cfgs),
+		waitSyncedConfigMap:   map[string]PutConfigRequest{},
 	}
 }
 
 func (s *protocolServer) FetchCluster(ctx context.Context, req *curppb.FetchClusterRequest) (*curppb.FetchClusterResponse, error) {
-	fmt.Println("fetch cluster", req)
+	logrus.Infof("fetch cluster: %+v\n", req)
 
-	res, ok := s.fetchClusterSample[req.String()]
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "data not found")
+	s.fetchClusterCnt++
+
+	for fcReq, fcReses := range s.fetchClusterConfigMap {
+		if CmpFetchClusterRequest(&fcReq, req) {
+			for _, fcCfgRes := range fcReses {
+				if fcCfgRes.Index == 0 {
+					if fcCfgRes.Type == "success" {
+						fcRes := BuildFetchClusterResponseFromFetchClusterConfigResponse(&fcCfgRes)
+						return fcRes, nil
+					}
+					if fcCfgRes.Type == "error" {
+						return nil, status.Errorf(codes.Code(fcCfgRes.Error.Code), fcCfgRes.Error.Message)
+					}
+				}
+				if fcCfgRes.Index == s.fetchClusterCnt {
+					if fcCfgRes.Type == "success" {
+						fcRes := BuildFetchClusterResponseFromFetchClusterConfigResponse(&fcCfgRes)
+						return fcRes, nil
+					}
+					if fcCfgRes.Type == "error" {
+						return nil, status.Errorf(codes.Code(fcCfgRes.Error.Code), fcCfgRes.Error.Message)
+					}
+				}
+			}
+		}
 	}
-
-	return res, nil
+	return nil, status.Errorf(codes.NotFound, "data not found")
 }
 
 func (s *protocolServer) Propose(ctx context.Context, req *curppb.ProposeRequest) (*curppb.ProposeResponse, error) {
-	fmt.Println("propose:", req)
+	logrus.Infof("propose: %+v\n", req)
 
-	var cmd xlinepb.Command
-	bcmd := req.Command
-	err := proto.Unmarshal(bcmd, &cmd)
+	s.putProposeCnt++
+
+	cmd := xlinepb.Command{}
+	err := proto.Unmarshal(req.Command, &cmd)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid command")
+		return nil, err
 	}
 
-	s.commandSample[req.GetProposeId().String()] = &cmd
-
-	res, ok := s.proposeSample[cmd.String()]
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "data not found")
+	if cmd.Request.GetPutRequest() != nil {
+		putReq := cmd.Request.GetPutRequest()
+		for cfgReq, cfgRess := range s.putConfigMap {
+			s.waitSyncedConfigMap[req.ProposeId.String()] = cfgReq
+			if CmpPutRequest(&cfgReq, putReq) {
+				for _, cfgRes := range cfgRess {
+					if cfgRes.Index == 0 {
+						ppsRes := cfgRes.Propose
+						if ppsRes.Type == "success" {
+							putRes := BuildPutResponseFromPutConfigResponse(&ppsRes)
+							bPutRes, _ := proto.Marshal(putRes)
+							return &curppb.ProposeResponse{Result: &curppb.CmdResult{Result: &curppb.CmdResult_Ok{Ok: bPutRes}}}, nil
+						}
+						if ppsRes.Type == "error" {
+							return nil, status.Errorf(codes.Code(ppsRes.Error.Code), ppsRes.Error.Message)
+						}
+					}
+					if cfgRes.Index == s.putProposeCnt {
+						ppsRes := cfgRes.Propose
+						if ppsRes.Type == "success" {
+							putRes := BuildPutResponseFromPutConfigResponse(&ppsRes)
+							bPutRes, _ := proto.Marshal(putRes)
+							return &curppb.ProposeResponse{Result: &curppb.CmdResult{Result: &curppb.CmdResult_Ok{Ok: bPutRes}}}, nil
+						}
+						if ppsRes.Type == "error" {
+							return nil, status.Errorf(codes.Code(ppsRes.Error.Code), ppsRes.Error.Message)
+						}
+					}
+				}
+			}
+		}
 	}
-
-	return res, nil
+	return nil, status.Errorf(codes.NotFound, "data not found in put config map")
 }
 
 func (s *protocolServer) WaitSynced(ctx context.Context, req *curppb.WaitSyncedRequest) (*curppb.WaitSyncedResponse, error) {
-	fmt.Println("wait synced:", req)
+	logrus.Infof("wait synced: %+v\n", req)
+	time.Sleep(100 * time.Microsecond)
 
-	cmd, ok := s.commandSample[req.GetProposeId().String()]
+	s.putWaitSyncedCnt++
+
+	data, ok := s.waitSyncedConfigMap[req.ProposeId.String()]
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "data not found")
+		return nil, status.Errorf(codes.NotFound, "data not found in cmd map")
 	}
 
-	res, ok := s.waitSyncSample[cmd.String()]
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "data not found")
-	}
+	for cfgReq, cfgRess := range s.putConfigMap {
+		if data.Key == cfgReq.Key && data.Value == cfgReq.Value && data.PrevKv == cfgReq.PrevKv {
+			for _, cfgRes := range cfgRess {
+				if cfgRes.Index == 0 {
+					wsRes := cfgRes.WaitSynced
+					if wsRes.Type == "success" {
+						putRes := BuildPutResponseFromPutConfigResponse(&wsRes)
+						bPutRes, _ := proto.Marshal(putRes)
+						return &curppb.WaitSyncedResponse{AfterSyncResult: &curppb.CmdResult{Result: &curppb.CmdResult_Ok{Ok: bPutRes}}, ExeResult: &curppb.CmdResult{Result: &curppb.CmdResult_Ok{Ok: bPutRes}}}, nil
+					}
+					if wsRes.Type == "error" {
+						return nil, status.Errorf(codes.Code(wsRes.Error.Code), wsRes.Error.Message)
+					}
+				}
+				if cfgRes.Index == s.putProposeCnt {
+					wsRes := cfgRes.WaitSynced
+					if wsRes.Type == "success" {
+						putRes := BuildPutResponseFromPutConfigResponse(&wsRes)
+						bPutRes, _ := proto.Marshal(putRes)
+						return &curppb.WaitSyncedResponse{AfterSyncResult: &curppb.CmdResult{Result: &curppb.CmdResult_Ok{Ok: bPutRes}}, ExeResult: &curppb.CmdResult{Result: &curppb.CmdResult_Ok{Ok: bPutRes}}}, nil
+					}
+					if wsRes.Type == "error" {
+						return nil, status.Errorf(codes.Code(wsRes.Error.Code), wsRes.Error.Message)
+					}
+				}
+			}
 
-	return res, nil
+		}
+	}
+	return nil, status.Errorf(codes.NotFound, "data not found in put config map")
 }
