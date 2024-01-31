@@ -1,0 +1,82 @@
+- method: fetch_cluster
+  input:
+    fetch_cluster:
+      linearizable: true
+  output:
+    fetch_cluster:
+      - data:
+          leader_id: 0
+          term: 2
+          cluster_id: 123
+          cluster_version: 1
+      - data:
+          leader_id: 0
+          term: 2
+          cluster_id: 123
+          cluster_version: 1
+      - data:
+          leader_id: 0
+          term: 2
+          cluster_id: 123
+          cluster_version: 1
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 1
+  output:
+    propose:
+      data:
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 2
+  output:
+    propose:
+      error:
+        code: 3
+        message: duplicated
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 3
+  output:
+    propose:
+      data:
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 4
+  output:
+    propose:
+      data:
+        type: range
+        range:
+          count: 1
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 5
+  output:
+    propose:
+      data:
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 7
+  output:
+    propose:
+      data:
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 8
+  output:
+    propose:
+      data:
