@@ -1,0 +1,115 @@
+- method: fetch_cluster
+  input:
+    fetch_cluster:
+      linearizable: true
+  output:
+    fetch_cluster:
+      - data:
+          leader_id: 3
+          term: 1
+          cluster_id: 123
+          members:
+            - id: 0
+              name: S0
+              addrs:
+                - B0
+            - id: 1
+              name: S1
+              addrs:
+                - B1
+            - id: 2
+              name: S2
+              addrs:
+                - B2
+            - id: 3
+              name: S3
+              addrs:
+                - B3
+            - id: 4
+              name: S4
+              addrs:
+                - B4
+          cluster_version: 1
+      - data:
+          leader_id: 3
+          term: 1
+          cluster_id: 123
+          members:
+            - id: 0
+              name: S0
+              addrs:
+                - B0
+            - id: 1
+              name: S1
+              addrs:
+                - B1
+            - id: 2
+              name: S2
+              addrs:
+                - B2
+            - id: 3
+              name: S3
+              addrs:
+                - B3
+            - id: 4
+              name: S4
+              addrs:
+                - B4
+          cluster_version: 1
+      - data:
+          leader_id: 0
+          term: 2
+          cluster_id: 123
+          cluster_version: 1
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 1
+  output:
+    propose:
+      data:
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 3
+  output:
+    propose:
+      error:
+        code: 3
+        message: key conflict
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 4
+  output:
+    propose:
+      data:
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 5
+  output:
+    propose:
+      data:
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 7
+  output:
+    propose:
+      data:
+- method: propose
+  input:
+    propose:
+      propose_id:
+        seq_num: 8
+  output:
+    propose:
+      error:
+        code: 3
+        message: key conflict
