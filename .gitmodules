@@ -1,6 +1,7 @@
+
 [submodule "api/curp-proto"]
 	path = api/curp-proto
-	url = git@github.com:xline-kv/curp-proto.git
+	url = https://github.com/xline-kv/curp-proto.git
 [submodule "api/xline-proto"]
 	path = api/xline-proto
-	url = git@github.com:xline-kv/xline-proto.git
+	url = https://github.com/xline-kv/xline-proto.git
