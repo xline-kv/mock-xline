@@ -21,7 +21,7 @@
 go.work
 
 # Protobuf generated file
-gen
+# gen
 
 # VSCode config file
 .vscode
