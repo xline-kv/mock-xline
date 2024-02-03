@@ -17,20 +17,17 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:8080", "node address")
 	config := flag.String("config", "node1", "config name")
 	flag.Parse()
-	fmt.Println(*name, *addr, *config)
 
 	cfg, err := os.ReadFile(fmt.Sprintf("config/%s.yml", *config))
 	if err != nil {
 		panic("read config file fail")
 	}
-	fmt.Println(string(cfg))
 
 	ops := []server.Operation{}
 	err = yaml.Unmarshal(cfg, &ops)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("%+v\n", ops)
 
 	fetchClusterOpMap := map[string][]server.FetchClusterResponse{}
 	proposeOpMap := map[string]server.ProposeResponse{}
