@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"time"
-	// "encoding/json"
 	"fmt"
 
 	curppb "github.com/xline-kv/mock-xline/gen/curppb"
@@ -18,7 +17,9 @@ type protocolServer struct {
 
 	fetchClusterOpCnt uint
 	fetchClusterOpMap map[string][]FetchClusterResponse
+	proposeOpCnt      uint
 	proposeOpMap      map[string]ProposeResponse
+	waitSyncedOpCnt   uint
 	waitSyncedOpMap   map[string]WaitSyncedResponse
 }
 
@@ -55,9 +56,6 @@ func (s *protocolServer) FetchCluster(ctx context.Context, req *curppb.FetchClus
 
 func (s *protocolServer) Propose(ctx context.Context, req *curppb.ProposeRequest) (*curppb.ProposeResponse, error) {
 	fmt.Println("propose request:", req.String())
-	for key, val := range s.proposeOpMap {
-		fmt.Println("p", key, val)
-	}
 
 	if res, ok := s.proposeOpMap[req.String()]; ok {
 		if res.Error == nil {
@@ -86,15 +84,23 @@ func (s *protocolServer) Propose(ctx context.Context, req *curppb.ProposeRequest
 		}
 		return nil, res.Error.Err()
 	}
+
+	s.proposeOpCnt++
+	switch s.proposeOpCnt {
+	case 1:
+		err := RpcError{Code: 13, Message: "shutting down"}
+		return nil, err.Err()
+	case 2, 3, 4:
+		err := RpcError{Code: 13, Message: "key conflict"}
+		return nil, err.Err()
+	}
+
 	return nil, status.New(codes.NotFound, "not found").Err()
 }
 
 func (s *protocolServer) WaitSynced(ctx context.Context, req *curppb.WaitSyncedRequest) (*curppb.WaitSyncedResponse, error) {
 	time.Sleep(100 * time.Millisecond)
 	fmt.Println("wait synced:", req.String())
-	for id, op := range s.waitSyncedOpMap {
-		fmt.Println(id, op)
-	}
 
 	if res, ok := s.waitSyncedOpMap[req.String()]; ok {
 		if res.Error == nil {
@@ -129,43 +135,16 @@ func (s *protocolServer) WaitSynced(ctx context.Context, req *curppb.WaitSyncedR
 		}
 		return nil, res.Error.Err()
 	}
-	fmt.Println("not found")
+
+	s.waitSyncedOpCnt++
+	switch s.waitSyncedOpCnt {
+	case 1:
+		err := RpcError{Code: 13, Message: "shutting down"}
+		return nil, err.Err()
+	case 2, 3, 4:
+		err := RpcError{Code: 13, Message: "key conflict"}
+		return nil, err.Err()
+	}
+
 	return nil, status.New(codes.NotFound, "not found").Err()
-
-	// 	if config, ok := s.waitSyncedConfigMap[req.ProposeId.SeqNum]; ok {
-	// 		switch config {
-	// 		case "default_response":
-	// 			er := &xlinepb.CommandResponse{
-	// 				ResponseWrapper: &xlinepb.CommandResponse_RangeResponse{
-	// 					RangeResponse: &xlinepb.RangeResponse{},
-	// 				},
-	// 			}
-	// 			ber, err := proto.Marshal(er)
-	// 			if err != nil {
-	// 				panic(err)
-	// 			}
-	// 			asr := &xlinepb.SyncResponse{Revision: 1}
-	// 			basr, err := proto.Marshal(asr)
-	// 			if err != nil {
-	// 				panic(err)
-	// 			}
-
-	//			return &curppb.WaitSyncedResponse{
-	//				ExeResult: &curppb.CmdResult{
-	//					Result: &curppb.CmdResult_Ok{
-	//						Ok: ber,
-	//					},
-	//				},
-	//				AfterSyncResult: &curppb.CmdResult{
-	//					Result: &curppb.CmdResult_Ok{
-	//						Ok: basr,
-	//					},
-	//				},
-	//			}, nil
-	//		default:
-	//			return nil, status.Errorf(codes.InvalidArgument, "unknown config %s", config)
-	//		}
-	//	}
-	//
-	// return nil, status.Errorf(codes.InvalidArgument, "unknown config")
 }
